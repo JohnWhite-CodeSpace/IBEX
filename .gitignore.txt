@@ -1,0 +1,8 @@
+.idea/
+__pycache__/
+Data/
+.gitignore
+Good_Paths_Catalog_Lo
+GoodPathsCatalog2
+Hi_Q-ABC_Good_Times_DB
+Lo_Q-ABC_Good_Triples_DB
