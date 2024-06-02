@@ -1,0 +1,14 @@
+# Ignore the .idea directory
+.idea/
+
+# Ignore Python bytecode files
+__pycache__/
+
+# Ignore a specific directory
+Data/
+
+# Ignore specific files
+Good_Paths_Catalog_Lo
+GoodPathsCatalog2
+Hi_Q-ABC_Good_Times_DB
+Lo_Q-ABC_Good_Triples_DB
