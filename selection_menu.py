@@ -57,8 +57,7 @@ class SelectionFrame(QMainWindow):
         self.QualH_num = ["Q-ABC", "Q-AB", "Q-BC", "Q-AC", "None"]
         self.event_types = ['Direct events', 'Histogram events']
         self.file_types = ["hide", "lode", "hihb", "lohb"]
-        self.extra_calculation_option = 0
-        self.setFixedSize(QSize(380, 400))
+        self.setFixedSize(QSize(380, 500))  # Adjusted size to accommodate new elements
         self.setWindowTitle("Select sorting options:")
         self.init_sub_ui()
         self.load_qt_stylesheet("Themes/dark_stylesheet.css")
@@ -69,7 +68,7 @@ class SelectionFrame(QMainWindow):
                 style_str = file.read()
             self.setStyleSheet(style_str)
         except Exception as e:
-            self.terminal.append(f"Failed to load stylesheet: {e}")
+            print(f"Failed to load stylesheet: {e}")
 
     def init_sub_ui(self):
         frame = QFrame()
@@ -87,6 +86,14 @@ class SelectionFrame(QMainWindow):
         self.qualh_combobox = self.add_checkable_combobox(selection_layout, "QualH", self.QualH_num)
         self.filetype_combobox = self.add_checkable_combobox(selection_layout, "File Types", self.file_types)
 
+        self.channels_combobox = CheckableComboBox()
+        self.particle_events_combobox = CheckableComboBox()
+
+        selection_layout.addWidget(QLabel("Channels"))
+        selection_layout.addWidget(self.channels_combobox)
+        selection_layout.addWidget(QLabel("Particle Events"))
+        selection_layout.addWidget(self.particle_events_combobox)
+
         bottom_layout = QHBoxLayout()
         confirm = QPushButton("Confirm")
         cancel = QPushButton("Cancel")
@@ -98,7 +105,7 @@ class SelectionFrame(QMainWindow):
 
         main_layout.addLayout(middle_frame_layout)
         main_layout.addLayout(bottom_layout)
-
+        self.instruction_combobox.currentTextChanged.connect(self.update_additional_comboboxes)
         self.setCentralWidget(frame)
 
     def add_combobox(self, layout, label_text, options):
@@ -118,18 +125,40 @@ class SelectionFrame(QMainWindow):
         layout.addWidget(combobox)
         return combobox
 
+    def update_additional_comboboxes(self):
+        instruction = self.instruction_combobox.currentText()
+        self.channels_combobox.clear()
+        self.particle_events_combobox.clear()
+        self.qualh_combobox.clear()
+
+        if instruction == "HiCullGoodTimes.txt":
+            self.channels_combobox.addItems([f"Channel {i}" for i in range(1, 7)])
+            self.channels_combobox.addItem("All")
+            self.particle_events_combobox.addItem("All")
+            self.qualh_combobox.addItems(["Q-ABC", "Q-AB", "Q-BC", "Q-AC"])
+        elif instruction == "LoGoodTimes.txt":
+            self.channels_combobox.addItems([f"Channel {i}" for i in range(1, 9)])
+            self.channels_combobox.addItem("All")
+            self.particle_events_combobox.addItems(["Hydrogen", "Oxygen"])
+            self.qualh_combobox.addItems([f"TOF{i}" for i in range(0, 4)])
+        else:
+            return
     def on_confirm(self):
         instruction = self.instruction_combobox.currentText()
         quaternion = self.quaternion_combobox.currentText()
         event = self.event_combobox.currentText()
         qualh = self.qualh_combobox.items()
         file_types = self.filetype_combobox.items()
+        channels = self.channels_combobox.items()
+        particle_events = self.particle_events_combobox.items()
         options = {
             'instruction': instruction,
             'quaternion': quaternion,
             'event': event,
             'qualh': qualh,
-            'file_types': file_types
+            'file_types': file_types,
+            'channels': channels,
+            'particle_events': particle_events
         }
         self.sorting_options_selected.emit(options)
         self.close()

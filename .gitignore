@@ -9,6 +9,9 @@ Data/
 
 # Ignore specific files
 Good_Paths_Catalog_Lo
-GoodPathsCatalog2
-Hi_Q-ABC_Good_Times_DB
-Lo_Q-ABC_Good_Triples_DB
+Good_Paths_Catalog_Hi
+Hi_QABC_DataBase
+Lo_OxHyTrip_DataBase
+.gitignore
+
+
