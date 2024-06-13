@@ -282,6 +282,7 @@ class MainWindow(QMainWindow):
             self.terminal.append("Sorting completed. Saving results...")
             save_file_path, _ = QFileDialog.getSaveFileName(self, "Save text file with correct data paths", "",
                                                             "Text Files (*.txt)")
+            self.sorting_alg.save_loading_log()
             if save_file_path:
                 self.save_thread = threading.Thread(target=self.sorting_alg.save_correct_paths_to_file,
                                                     args=(save_file_path,))

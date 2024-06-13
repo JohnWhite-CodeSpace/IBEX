@@ -1,5 +1,7 @@
 import os
 import re
+import time
+
 import pandas as pd
 import sqlite3
 from PyQt5.QtCore import pyqtSignal, QObject
@@ -34,6 +36,7 @@ class SortingAlgorithm(QObject):
         self.stop_flag = False
         self.particle_event = []
         self.channels = []
+        self.time_log = []
 
     def set_instruction_file(self, instruction):
         self.instruction = instruction
@@ -119,6 +122,7 @@ class SortingAlgorithm(QObject):
 
     def first_stage_processing(self):
         self.terminal.append("Starting first stage processing...")
+        self.time_log.append("Time:\tFile:\tNumber of lines:")
         self.total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(self.path))
         self.scanned_dirs = 0
         self.correct_dir_paths.clear()
@@ -186,7 +190,10 @@ class SortingAlgorithm(QObject):
             if not self.check_filter_in_filepath(filepath) or not self.check_channel_observation(filepath):
                 return
             self.terminal.append(f"Found file in: {filepath}")
-            lines = np.loadtxt(filepath, dtype='str')
+            start = round(time.time()*1000)
+            lines = np.loadtxt(filepath, dtype="str")
+            end = round(time.time()*1000)
+            self.time_log.append(f"{end-start}\t{file}\t{len(lines)}")
             data = self.process_filtered_lines(lines, filepath)
             self.write_to_database(data)
 
@@ -265,3 +272,8 @@ class SortingAlgorithm(QObject):
 
     def stop_sorting_process(self):
         self.stop_flag = True
+
+    def save_loading_log(self):
+        with open("TimeLoadingLog.txt", 'a') as time_file:
+            time_file.writelines(self.time_log)
+        self.terminal.append(f"Time Log saved to {time}")
