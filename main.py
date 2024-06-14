@@ -2,13 +2,14 @@ import sys
 import os
 import threading
 from PyQt5.QtCore import QSize, pyqtSignal, Qt, QObject
-from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QKeySequence, QIcon
 from PyQt5.QtWidgets import (
-    QMainWindow, QLabel, QTextEdit, QPushButton, QFileDialog, QMenuBar, QMenu, QAction,
-    QProgressBar, QVBoxLayout, QHBoxLayout, QFrame, QApplication, QWidget, QTreeWidget,
-    QTreeWidgetItem, QMessageBox, QShortcut
+    QMainWindow, QLabel, QTextEdit, QPushButton, QFileDialog, QAction,
+    QProgressBar, QVBoxLayout, QHBoxLayout, QFrame, QApplication, QTreeWidget,
+    QTreeWidgetItem, QShortcut
 )
 import sorting_algorithm
+from selection_menu import SelectionFrame
 
 
 class DirectoryLoader(QObject):
@@ -20,6 +21,9 @@ class DirectoryLoader(QObject):
         self.path = path
         self.total_items = 0
         self.loaded_items = 0
+        self.icon_folder = QIcon('res/folder.png')
+        self.icon_textfile = QIcon('res/textfile.png')
+        self.icon_unknownfile = QIcon('res/unknownfile.png')
 
     def count_items(self, path):
         for root, dirs, files in os.walk(path):
@@ -32,7 +36,12 @@ class DirectoryLoader(QObject):
                 full_path = os.path.join(path, item)
                 child_item = QTreeWidgetItem(parent_item, [item])
                 if os.path.isdir(full_path):
+                    child_item.setIcon(0, self.icon_folder)
                     add_items(child_item, full_path)
+                elif item.endswith('.txt'):
+                    child_item.setIcon(0, self.icon_textfile)
+                else:
+                    child_item.setIcon(0, self.icon_unknownfile)
                 self.loaded_items += 1
                 progress = int((self.loaded_items / self.total_items) * 100)
                 self.update_progress.emit(progress)
@@ -43,13 +52,17 @@ class DirectoryLoader(QObject):
         self.update_tree.emit(root)
 
 
+
 class MainWindow(QMainWindow):
     update_progress_signal = pyqtSignal(int)
+    update_label_signal = pyqtSignal(str)
     update_tree_signal = pyqtSignal(object)
+    update_second_progress_signal = pyqtSignal(int)
+    update_second_label_signal = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
-        self.setFixedSize(QSize(1200, 600))
+        self.setFixedSize(QSize(1200, 700))
         self.setWindowTitle("IBEX Data Sorter")
         self.path = os.getcwd()
         self.txt_file_path = None
@@ -94,13 +107,18 @@ class MainWindow(QMainWindow):
         progress_layout = QVBoxLayout()
         self.progress_label = QLabel("Current progress:")
         self.progress_bar = QProgressBar(self)
+        self.second_progress_label = QLabel("Folder scanning progress:")
+        self.second_progress_bar = QProgressBar(self)
         progress_layout.addWidget(self.progress_label)
         progress_layout.addWidget(self.progress_bar)
+        progress_layout.addWidget(self.second_progress_label)
+        progress_layout.addWidget(self.second_progress_bar)
 
         buttons_layout = QVBoxLayout()
         self.start_button = QPushButton('Start sorting data', self)
         self.start_button.pressed.connect(self.confirm_sorting)
         self.stop_button = QPushButton('Stop', self)
+        self.stop_button.pressed.connect(self.stop_sorting_process)
         buttons_layout.addWidget(self.start_button)
         buttons_layout.addWidget(self.stop_button)
 
@@ -111,9 +129,20 @@ class MainWindow(QMainWindow):
 
         self.create_menubar()
 
-        self.update_progress_signal.connect(self.progress_bar.setValue)
+        self.update_progress_signal.connect(self.progress_bar.setValue, )
         self.update_tree_signal.connect(self.update_file_tree)
-        self.sorting_alg = sorting_algorithm.SortingAlgorithm(self.terminal, os.getcwd(), self.progress_label)
+        self.update_second_progress_signal.connect(self.second_progress_bar.setValue)
+
+        self.update_label_signal.connect(self.progress_label.setText)
+        self.update_second_label_signal.connect(self.second_progress_label.setText)
+
+        self.sorting_alg = sorting_algorithm.SortingAlgorithm(self.terminal, os.getcwd())
+
+        self.sorting_alg.update_progress.connect(self.update_progress_signal)
+        self.sorting_alg.update_second_progress.connect(self.update_second_progress_signal)
+        self.sorting_alg.update_label.connect(self.update_label_signal)
+        self.sorting_alg.update_second_label.connect(self.update_second_label_signal)
+
         self.start_directory_loading(os.getcwd())
 
         self.shortcut_save = QShortcut(QKeySequence("Ctrl+S"), self)
@@ -173,10 +202,6 @@ class MainWindow(QMainWindow):
         else:
             self.terminal.append(f"Error: Cannot load theme {stylesheet}")
 
-    def refres_ui(self):
-        for widget in QApplication.allWidgets():
-            widget.setStyleSheet(style_sheet)
-
     def update_file_tree(self, root_item):
         self.file_tree.clear()
         self.file_tree.addTopLevelItem(root_item)
@@ -188,6 +213,7 @@ class MainWindow(QMainWindow):
             self.path = selected_dir
             self.file_dialog_label.setText(f"Current path: {selected_dir}")
             self.progress_bar.setValue(0)
+            self.second_progress_bar.setValue(0)
             self.start_directory_loading(selected_dir)
 
     def open_txt_file(self):
@@ -219,30 +245,50 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def confirm_sorting(self):
-        confirm_dialog = QMessageBox()
-        confirm_dialog.setWindowTitle("Confirm Sorting")
-        confirm_dialog.setText("Are you sure that the selected directory contains IBEX data?")
-        confirm_dialog.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        confirm_dialog.setDefaultButton(QMessageBox.No)
-        response = confirm_dialog.exec()
+        self.selection_frame = SelectionFrame()
+        self.selection_frame.sorting_options_selected.connect(self.start_sorting_data_with_options)
+        self.selection_frame.show()
 
-        if response == QMessageBox.Yes:
-            self.terminal.append(f"Starting sorting process for directory: {self.path}")
-            self.start_sorting_data()
-        else:
-            self.terminal.append(f"Sorting process aborted for directory: {self.path}")
+    def start_sorting_data_with_options(self, options):
+        print(options['instruction'])
+        print(options['quaternion'])
+        print(options['event'])
+        print(options['qualh'])
+        print(options['file_types'])
+        print(options['channels'])
+        print(options['particle_events'])
+        self.sorting_alg.set_instruction_file(options['instruction'])
+        self.sorting_alg.set_quaternion_file_type(options['quaternion'])
+        self.sorting_alg.set_event_type(options['event'])
+        self.sorting_alg.set_qualh(options['qualh'], options['instruction'])
+        self.sorting_alg.set_filenames_for_sorting(options['file_types'])
+        self.sorting_alg.set_channels(options['channels'])
+        self.sorting_alg.set_particle_events(options['particle_events'])
+        self.start_sorting_data()
 
     def start_sorting_data(self):
         self.sorting_thread = threading.Thread(target=self.run_sorting_process)
         self.sorting_thread.start()
 
+    def stop_sorting_process(self):
+        self.sorting_alg.stop_sorting_process()
+
     def run_sorting_process(self):
-        self.sorting_alg.first_stage_sorting()
-        self.terminal.append("Sorting completed. Saving results...")
-        save_file_path, _ = QFileDialog.getSaveFileName(self, "Save text file with correct data paths", "", "Text Files (*.txt)")
-        if save_file_path:
-            self.save_thread = threading.Thread(target=self.sorting_alg.save_correct_paths_to_file, args=(save_file_path,))
-            self.save_thread.start()
+        self.sorting_alg.set_path(self.path)
+        name, _ = QFileDialog.getSaveFileName(self, "Save DataBase File As", "", "DataBase Files (*.db)")
+        if name:
+            self.sorting_alg.set_database_connection(name)
+            self.sorting_alg.first_stage_processing()
+            self.terminal.append("Sorting completed. Saving results...")
+            save_file_path, _ = QFileDialog.getSaveFileName(self, "Save text file with correct data paths", "",
+                                                            "Text Files (*.txt)")
+            self.sorting_alg.save_loading_log()
+            if save_file_path:
+                self.save_thread = threading.Thread(target=self.sorting_alg.save_correct_paths_to_file,
+                                                    args=(save_file_path,))
+                self.save_thread.start()
+        else:
+            self.terminal.append("Choose database file first!")
 
 
 if __name__ == "__main__":
@@ -250,3 +296,4 @@ if __name__ == "__main__":
     main_window = MainWindow()
     main_window.show()
     sys.exit(app.exec())
+

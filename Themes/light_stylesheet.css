@@ -6,7 +6,9 @@ QFrame {
     background-color: #e0e0e0;
     border: 1px solid #b6b6b6;
 }
-
+QProgressBar {
+    height: 6px;
+}
 QLineEdit {
     color: #000000;
     background-color: #d4d4d4;
@@ -26,7 +28,7 @@ QPushButton {
     margin: 4px 8px 4px 8px;
     border-radius: 3px;
     min-width: 14px;
-    min-height: 14px;
+    min-height: 24px;
 }
 
 QPushButton:focus {

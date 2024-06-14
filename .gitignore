@@ -1,0 +1,17 @@
+# Ignore the .idea directory
+.idea/
+
+# Ignore Python bytecode files
+__pycache__/
+
+# Ignore a specific directory
+Data/
+
+# Ignore specific files
+Good_Paths_Catalog_Lo
+Good_Paths_Catalog_Hi
+Hi_QABC_DataBase
+Lo_OxHyTrip_DataBase
+.gitignore
+
+
