@@ -4,6 +4,8 @@ import time
 
 import pandas as pd
 import sqlite3
+
+import torch
 from PyQt5.QtCore import pyqtSignal, QObject
 import numpy as np
 
@@ -192,7 +194,8 @@ class SortingAlgorithm(QObject):
             self.terminal.append(f"Found file in: {filepath}")
             try:
                 start = round(time.time() * 1000)
-                lines = pd.read_csv(filepath, sep='\s+', comment='#', header=None)
+                lines = torch.tensor(pd.read_csv(filepath, sep='\s+', comment='#', header=None).values,
+                                     dtype=torch.float32)
                 end = round(time.time() * 1000)
                 load_time = end - start
                 self.time_log.append(f"{load_time}\t{file}\t{len(lines)}\n")
@@ -207,9 +210,9 @@ class SortingAlgorithm(QObject):
         self.total_lines = len(lines)
         self.scanned_lines = 0
 
-        met_values = lines.iloc[:, 0].astype(float)
-        ch_values = lines.iloc[:, 3]
-        ty_values = lines.iloc[:, 4]
+        met_values = lines[:, 0]
+        ch_values = lines[:, 3]
+        ty_values = lines[:, 4]
 
         for filter_entry in self.filters:
             if filter_entry[0] in filepath:
@@ -220,10 +223,9 @@ class SortingAlgorithm(QObject):
                 filtered_ch_values = ch_values[mask]
                 filtered_ty_values = ty_values[mask]
 
-                for line, ty, ch in zip(filtered_lines.itertuples(index=False, name=None), filtered_ty_values,
-                                        filtered_ch_values):
+                for line, ty, ch in zip(filtered_lines, filtered_ty_values, filtered_ch_values):
                     if ty in self.condition and ch in self.particle_event:
-                        filtered_data.append(line)
+                        filtered_data.append(line.tolist())
 
         return filtered_data
 
@@ -280,6 +282,6 @@ class SortingAlgorithm(QObject):
         self.stop_flag = True
 
     def save_loading_log(self):
-        with open("TimeLoadingLogPandas.txt", 'a') as time_file:
+        with open("TimeLoadingLogTorch.txt", 'a') as time_file:
             time_file.writelines(self.time_log)
         self.terminal.append(f"Time Log saved to {time_file}")
