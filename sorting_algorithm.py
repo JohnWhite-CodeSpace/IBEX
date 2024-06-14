@@ -122,7 +122,7 @@ class SortingAlgorithm(QObject):
 
     def first_stage_processing(self):
         self.terminal.append("Starting first stage processing...")
-        self.time_log.append("Time:\tFile:\tNumber of lines:")
+        self.time_log.append("Time:\tFile:\tNumber of lines:\n")
         self.total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(self.path))
         self.scanned_dirs = 0
         self.correct_dir_paths.clear()
@@ -193,7 +193,8 @@ class SortingAlgorithm(QObject):
             start = round(time.time()*1000)
             lines = np.loadtxt(filepath, dtype="str")
             end = round(time.time()*1000)
-            self.time_log.append(f"{end-start}\t{file}\t{len(lines)}")
+            load_time = end - start
+            self.time_log.append(f"{load_time}\t{file}\t{len(lines)}\n")
             data = self.process_filtered_lines(lines, filepath)
             self.write_to_database(data)
 
@@ -274,6 +275,6 @@ class SortingAlgorithm(QObject):
         self.stop_flag = True
 
     def save_loading_log(self):
-        with open("TimeLoadingLog.txt", 'a') as time_file:
+        with open("TimeLoadingLogNumpy.txt", 'a') as time_file:
             time_file.writelines(self.time_log)
         self.terminal.append(f"Time Log saved to {time}")
