@@ -115,11 +115,14 @@ class MainWindow(QMainWindow):
         progress_layout.addWidget(self.second_progress_bar)
 
         buttons_layout = QVBoxLayout()
-        self.start_button = QPushButton('Start sorting data', self)
-        self.start_button.pressed.connect(self.confirm_sorting)
+        self.start_button_DB = QPushButton('Start sorting data (Save As DataBase)', self)
+        self.start_button_DS = QPushButton('Start sorting data (Save As DataSet)', self)
+        self.start_button_DB.pressed.connect(self.confirm_sorting_DB)
+        self.start_button_DS.pressed.connect(self.confirm_sorting_DS)
         self.stop_button = QPushButton('Stop', self)
         self.stop_button.pressed.connect(self.stop_sorting_process)
-        buttons_layout.addWidget(self.start_button)
+        buttons_layout.addWidget(self.start_button_DB)
+        buttons_layout.addWidget(self.start_button_DS)
         buttons_layout.addWidget(self.stop_button)
 
         bottom_layout.addLayout(progress_layout, stretch=3)
@@ -164,9 +167,12 @@ class MainWindow(QMainWindow):
         file_menu.addAction("Save as...")
         file_menu.addAction("Save")
         file_menu.addAction("Settings")
-
         preferences_menu = menubar.addMenu("&Preferences")
-
+        dataset_menu = menubar.addMenu("DataSets")
+        dataset_menu.addAction("Create DataSet")
+        dataset_menu.addAction("Save DataSet")
+        dataset_menu.addAction("Load Dataset")
+        dataset_menu.addAction("Create Batch")
         theme_menu = preferences_menu.addMenu('Themes')
         dark_theme = QAction('Dark_theme', self)
         dark_theme.triggered.connect(lambda: self.load_qt_stylesheet("Themes/dark_stylesheet.css"))
@@ -244,10 +250,18 @@ class MainWindow(QMainWindow):
         self.thread = threading.Thread(target=self.directory_loader.load_directory)
         self.thread.start()
 
-    def confirm_sorting(self):
+    def confirm_sorting_DB(self):
         self.selection_frame = SelectionFrame()
+        self.sorting_alg.get_saving_option(1)
         self.selection_frame.sorting_options_selected.connect(self.start_sorting_data_with_options)
         self.selection_frame.show()
+
+    def confirm_sorting_DS(self):
+        self.selection_frame = SelectionFrame()
+        self.sorting_alg.get_saving_option(2)
+        self.selection_frame.sorting_options_selected.connect(self.start_sorting_data_with_options)
+        self.selection_frame.show()
+
 
     def start_sorting_data_with_options(self, options):
         print(options['instruction'])

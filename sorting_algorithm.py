@@ -1,11 +1,12 @@
 import os
 import re
 import time
-
+import torch
 import pandas as pd
 import sqlite3
 from PyQt5.QtCore import pyqtSignal, QObject
 import numpy as np
+import DatasetHandler as dsh
 
 
 class SortingAlgorithm(QObject):
@@ -22,6 +23,7 @@ class SortingAlgorithm(QObject):
         self.noquaternion = None
         self.instruction = None
         self.filters = None
+        self.DSDB = None
         self.terminal = terminal
         self.path = path
         self.correct_dir_paths = []
@@ -196,7 +198,7 @@ class SortingAlgorithm(QObject):
             load_time = end - start
             self.time_log.append(f"{load_time}\t{file}\t{len(lines)}\n")
             data = self.process_filtered_lines(lines, filepath)
-            self.write_to_database(data)
+            self.write_to(data)
 
     def process_filtered_lines(self, lines, filepath):
         filtered_data = []
@@ -222,15 +224,23 @@ class SortingAlgorithm(QObject):
 
         return filtered_data
 
-    def write_to_database(self, data):
-        if len(data) == 0:
-            return
-        columns = ["MET", "RA", "Decl", "ch", "ty", "count", "selnbits", "phase", "locXRE", "locYRE", "locZRE"]
-        df = pd.DataFrame(data, columns=columns)
-        try:
-            df.to_sql('data', self.conn, if_exists='append', index=False)
-        except sqlite3.Error as e:
-            self.terminal.append(f"SQLite error: {e}")
+    def write_to(self, data):
+        if self.DSDB == 1:
+            if len(data) == 0:
+                return
+            columns = ["MET", "RA", "Decl", "ch", "ty", "count", "selnbits", "phase", "locXRE", "locYRE", "locZRE"]
+            df = pd.DataFrame(data, columns=columns)
+            try:
+                df.to_sql('data', self.conn, if_exists='append', index=False)
+            except sqlite3.Error as e:
+                self.terminal.append(f"SQLite error: {e}")
+        elif self.DSDB == 2:
+            if len(data) == 0:
+                return
+            print("test")
+        else:
+            self.terminal.append("Something went wrong while saving sorted data...")
+
 
     def load_filtering_instructions(self, filename):
         try:
@@ -274,7 +284,11 @@ class SortingAlgorithm(QObject):
     def stop_sorting_process(self):
         self.stop_flag = True
 
+    def get_saving_option(self, option):
+        self.DSDB = option
+
     def save_loading_log(self):
         with open("TimeLoadingLogNumpy.txt", 'a') as time_file:
             time_file.writelines(self.time_log)
         self.terminal.append(f"Time Log saved to {time}")
+
