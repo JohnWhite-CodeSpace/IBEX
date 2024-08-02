@@ -1,7 +1,6 @@
 import os
 import re
 import time
-import torch
 import pandas as pd
 import sqlite3
 from PyQt5.QtCore import pyqtSignal, QObject
@@ -17,6 +16,7 @@ class SortingAlgorithm(QObject):
 
     def __init__(self, terminal, path):
         super().__init__()
+        self.dataset_filepath = None
         self.qualh = None
         self.event = None
         self.quaternion = None
@@ -39,6 +39,8 @@ class SortingAlgorithm(QObject):
         self.particle_event = []
         self.channels = []
         self.time_log = []
+        self.dataset = None
+        self.database = None
 
     def set_instruction_file(self, instruction):
         self.instruction = instruction
@@ -121,6 +123,16 @@ class SortingAlgorithm(QObject):
         self.conn = sqlite3.connect(name)
         self.cursor = self.conn.cursor()
         self.create_table()
+
+    def set_dataset(self, name, transform=None, target_transform=None):
+        self.dataset_filepath = name
+        self.dataset = dsh.DatasetHandler(self.terminal, transform=transform, target_transform=target_transform)
+
+    def save_dataset_to_file(self):
+        if hasattr(self, 'dataset_filepath') and self.dataset_filepath:
+            self.dataset.save_dataset(self.dataset_filepath)
+        else:
+            self.terminal.append("Dataset file path is not set.")
 
     def first_stage_processing(self):
         self.terminal.append("Starting first stage processing...")
@@ -237,7 +249,8 @@ class SortingAlgorithm(QObject):
         elif self.DSDB == 2:
             if len(data) == 0:
                 return
-            print("test")
+            else:
+                self.dataset.append(data)
         else:
             self.terminal.append("Something went wrong while saving sorted data...")
 

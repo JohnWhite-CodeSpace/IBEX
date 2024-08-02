@@ -2,29 +2,15 @@ import gzip
 import pickle
 import torch
 from torch.utils.data import Dataset, DataLoader
-
+import time
 
 class DatasetHandler(Dataset):
-    def __init__(self, datapath=None, data=None, transform=None, target_transform=None):
+    def __init__(self, terminal,  transform=None, target_transform=None):
         super().__init__()
         self.data = []
-        self.datapath = datapath
         self.transform = transform
         self.target_transform = target_transform
-        if datapath:
-            with open(datapath) as dataset:
-                for line in dataset.readlines():
-                    temp = line.strip().split(',')
-                    trans_line = []
-                    for ins in temp:
-                        try:
-                            float_val = float(ins)
-                            trans_line.append(float_val)
-                        except ValueError:
-                            trans_line.append(ins)
-                    self.data.append(tuple(trans_line))
-        elif data:
-            self.data = data
+        self.terminal = terminal
 
     def __len__(self):
         return len(self.data)
@@ -63,8 +49,26 @@ class DatasetHandler(Dataset):
         with gzip.open(filepath, 'wb') as f:
             pickle.dump(self.data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    @classmethod
-    def load_dataset(cls, filepath, transform=None, target_transform=None):
+    def append(self, new_data):
+        for ins in new_data:
+            trans_line = []
+            for item in ins:
+                try:
+                    float_val = float(item)
+                    trans_line.append(float_val)
+                except ValueError:
+                    trans_line.append(item)
+            self.data.append(tuple(trans_line))
+
+    def show_dataset(self, data):
+        if data:
+            for i in data:
+                self.terminal.append(data[i])
+                time.sleep(0.1)
+        self.terminal.append("Error while displaying dataset!")
+    def load_dataset(self , filepath, transform=None, target_transform=None):
         with gzip.open(filepath, 'rb') as f:
             data = pickle.load(f)
-        return cls(data=data, transform=transform, target_transform=target_transform)
+        print("loading done")
+        self.show_dataset(data)
+        # return cls(data=data, transform=transform, target_transform=target_transform)

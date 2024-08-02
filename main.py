@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 )
 import sorting_algorithm
 from selection_menu import SelectionFrame
+from DatasetHandler import DatasetHandler as dhs
 
 
 class DirectoryLoader(QObject):
@@ -62,11 +63,12 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.selection_frame = None
         self.setFixedSize(QSize(1200, 700))
         self.setWindowTitle("IBEX Data Sorter")
         self.path = os.getcwd()
         self.txt_file_path = None
-
+        self.save_option = 1
         main_frame = QFrame(self)
         self.setCentralWidget(main_frame)
         main_layout = QVBoxLayout(main_frame)
@@ -168,11 +170,12 @@ class MainWindow(QMainWindow):
         file_menu.addAction("Save")
         file_menu.addAction("Settings")
         preferences_menu = menubar.addMenu("&Preferences")
-        dataset_menu = menubar.addMenu("DataSets")
-        dataset_menu.addAction("Create DataSet")
-        dataset_menu.addAction("Save DataSet")
-        dataset_menu.addAction("Load Dataset")
-        dataset_menu.addAction("Create Batch")
+        dataset_menu = menubar.addMenu("&Datasets")
+        load_dataset = QAction('Load Dataset', self)
+        load_dataset.triggered.connect(self.load_dataset)
+        create_batch = QAction('Create Data Batch', self)
+        dataset_menu.addAction(load_dataset)
+        dataset_menu.addAction(create_batch)
         theme_menu = preferences_menu.addMenu('Themes')
         dark_theme = QAction('Dark_theme', self)
         dark_theme.triggered.connect(lambda: self.load_qt_stylesheet("Themes/dark_stylesheet.css"))
@@ -251,14 +254,16 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def confirm_sorting_DB(self):
+        self.save_option = 1
         self.selection_frame = SelectionFrame()
-        self.sorting_alg.get_saving_option(1)
+        self.sorting_alg.get_saving_option(self.save_option)
         self.selection_frame.sorting_options_selected.connect(self.start_sorting_data_with_options)
         self.selection_frame.show()
 
     def confirm_sorting_DS(self):
+        self.save_option = 2
         self.selection_frame = SelectionFrame()
-        self.sorting_alg.get_saving_option(2)
+        self.sorting_alg.get_saving_option(self.save_option)
         self.selection_frame.sorting_options_selected.connect(self.start_sorting_data_with_options)
         self.selection_frame.show()
 
@@ -278,18 +283,26 @@ class MainWindow(QMainWindow):
         self.sorting_alg.set_filenames_for_sorting(options['file_types'])
         self.sorting_alg.set_channels(options['channels'])
         self.sorting_alg.set_particle_events(options['particle_events'])
-        self.start_sorting_data()
+        if self.save_option == 1:
+            self.start_sorting_data_DB()
+        else:
+            self.start_sorting_data_DS()
 
-    def start_sorting_data(self):
-        self.sorting_thread = threading.Thread(target=self.run_sorting_process)
+    def start_sorting_data_DB(self):
+        self.sorting_thread = threading.Thread(target=self.run_sorting_process_DB)
+        self.sorting_thread.start()
+
+    def start_sorting_data_DS(self):
+        self.sorting_thread = threading.Thread(target=self.run_sorting_process_DS)
         self.sorting_thread.start()
 
     def stop_sorting_process(self):
         self.sorting_alg.stop_sorting_process()
 
-    def run_sorting_process(self):
+    def run_sorting_process_DB(self):
         self.sorting_alg.set_path(self.path)
         name, _ = QFileDialog.getSaveFileName(self, "Save DataBase File As", "", "DataBase Files (*.db)")
+
         if name:
             self.sorting_alg.set_database_connection(name)
             self.sorting_alg.first_stage_processing()
@@ -303,6 +316,32 @@ class MainWindow(QMainWindow):
                 self.save_thread.start()
         else:
             self.terminal.append("Choose database file first!")
+
+    def run_sorting_process_DS(self):
+        self.sorting_alg.set_path(self.path)
+        name, _ = QFileDialog.getSaveFileName(self, "Save Dataset File As", "", "Compressed Pickle Files (*.pkl.gz)")
+
+        if name:
+            self.sorting_alg.set_dataset(name)
+            self.sorting_alg.first_stage_processing()
+            self.terminal.append("Sorting completed. Saving results...")
+            self.sorting_alg.save_dataset_to_file()
+            save_file_path, _ = QFileDialog.getSaveFileName(self, "Save text file with correct data paths", "",
+                                                            "Text Files (*.txt)")
+            self.sorting_alg.save_loading_log()
+            if save_file_path:
+                self.save_thread = threading.Thread(target=self.sorting_alg.save_correct_paths_to_file,
+                                                    args=(save_file_path,))
+                self.save_thread.start()
+        else:
+            self.terminal.append("Choose dataset file first!")
+
+    def load_dataset(self):
+        name, _ = QFileDialog.getOpenFileName(self, "Select Dataset file", "", "Pickled datasets (*.gz)")
+        if name:
+            dhs.load_dataset(name)
+        else:
+            self.terminal.append("Cannot open this database!")
 
 
 if __name__ == "__main__":
