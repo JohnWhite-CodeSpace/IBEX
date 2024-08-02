@@ -10,8 +10,7 @@ from PyQt5.QtWidgets import (
 )
 import sorting_algorithm
 from selection_menu import SelectionFrame
-from DatasetHandler import DatasetHandler as dhs
-
+import DatasetHandler as dhs
 
 class DirectoryLoader(QObject):
     update_progress = pyqtSignal(int)
@@ -52,8 +51,6 @@ class DirectoryLoader(QObject):
         add_items(root, self.path)
         self.update_tree.emit(root)
 
-
-
 class MainWindow(QMainWindow):
     update_progress_signal = pyqtSignal(int)
     update_label_signal = pyqtSignal(str)
@@ -72,7 +69,7 @@ class MainWindow(QMainWindow):
         main_frame = QFrame(self)
         self.setCentralWidget(main_frame)
         main_layout = QVBoxLayout(main_frame)
-
+        self.dataset_handler = None
         top_layout = QHBoxLayout()
 
         self.file_dialog_frame = QFrame(self)
@@ -134,7 +131,7 @@ class MainWindow(QMainWindow):
 
         self.create_menubar()
 
-        self.update_progress_signal.connect(self.progress_bar.setValue, )
+        self.update_progress_signal.connect(self.progress_bar.setValue)
         self.update_tree_signal.connect(self.update_file_tree)
         self.update_second_progress_signal.connect(self.second_progress_bar.setValue)
 
@@ -185,6 +182,9 @@ class MainWindow(QMainWindow):
         classic_theme.triggered.connect(lambda: self.load_qt_stylesheet("Themes/classic_stylesheet.css"))
         external_theme = QAction('Load External Theme...', self)
         external_theme.triggered.connect(self.load_external_qt_stylesheet)
+        clear_terminals = QAction('Clear Terminals', self)
+        clear_terminals.triggered.connect(self.clear_terminals)
+        preferences_menu.addAction(clear_terminals)
         theme_menu.addAction(dark_theme)
         theme_menu.addAction(light_theme)
         theme_menu.addAction(classic_theme)
@@ -267,7 +267,6 @@ class MainWindow(QMainWindow):
         self.selection_frame.sorting_options_selected.connect(self.start_sorting_data_with_options)
         self.selection_frame.show()
 
-
     def start_sorting_data_with_options(self, options):
         print(options['instruction'])
         print(options['quaternion'])
@@ -319,7 +318,7 @@ class MainWindow(QMainWindow):
 
     def run_sorting_process_DS(self):
         self.sorting_alg.set_path(self.path)
-        name, _ = QFileDialog.getSaveFileName(self, "Save Dataset File As", "", "Compressed Pickle Files (*.pkl.gz)")
+        name, _ = QFileDialog.getSaveFileName(self, "Save Dataset File As", "", "Compressed Pickle Files (*.pt)")
 
         if name:
             self.sorting_alg.set_dataset(name)
@@ -337,16 +336,21 @@ class MainWindow(QMainWindow):
             self.terminal.append("Choose dataset file first!")
 
     def load_dataset(self):
-        name, _ = QFileDialog.getOpenFileName(self, "Select Dataset file", "", "Pickled datasets (*.gz)")
+        name, _ = QFileDialog.getOpenFileName(self, "Select Dataset file", "", "Pickled datasets (*.pt)")
         if name:
-            dhs.load_dataset(name)
+            self.terminal.append(f"Loading dataset from {name}...")
+            self.dataset_handler = dhs.DatasetHandler(self.terminal)
+            self.load_thread = threading.Thread(target=self.dataset_handler.unpack_dataset, args=(name,))
+            self.load_thread.start()
         else:
-            self.terminal.append("Cannot open this database!")
+            self.terminal.append("Cannot open this dataset!")
 
+    def clear_terminals(self):
+        self.terminal.clear()
+        self.txt_edit.clear()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     main_window = MainWindow()
     main_window.show()
     sys.exit(app.exec())
-

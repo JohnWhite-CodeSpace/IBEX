@@ -7,7 +7,6 @@ from PyQt5.QtCore import pyqtSignal, QObject
 import numpy as np
 import DatasetHandler as dsh
 
-
 class SortingAlgorithm(QObject):
     update_progress = pyqtSignal(int)
     update_second_progress = pyqtSignal(int)
@@ -254,7 +253,6 @@ class SortingAlgorithm(QObject):
         else:
             self.terminal.append("Something went wrong while saving sorted data...")
 
-
     def load_filtering_instructions(self, filename):
         try:
             lines = np.loadtxt(filename, dtype='str')
@@ -304,4 +302,3 @@ class SortingAlgorithm(QObject):
         with open("TimeLoadingLogNumpy.txt", 'a') as time_file:
             time_file.writelines(self.time_log)
         self.terminal.append(f"Time Log saved to {time}")
-
