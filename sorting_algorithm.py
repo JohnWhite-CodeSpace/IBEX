@@ -5,7 +5,6 @@ import pandas as pd
 import sqlite3
 from PyQt5.QtCore import pyqtSignal, QObject
 import numpy as np
-import DatasetHandler as dsh
 
 class SortingAlgorithm(QObject):
     update_progress = pyqtSignal(int)
@@ -20,9 +19,8 @@ class SortingAlgorithm(QObject):
         self.event = None
         self.quaternion = None
         self.noquaternion = None
-        self.instruction = None
+        self.instruction = "HiCullGoodTimes.txt"
         self.filters = None
-        self.DSDB = None
         self.terminal = terminal
         self.path = path
         self.correct_dir_paths = []
@@ -38,7 +36,6 @@ class SortingAlgorithm(QObject):
         self.particle_event = []
         self.channels = []
         self.time_log = []
-        self.dataset = None
         self.database = None
 
     def set_instruction_file(self, instruction):
@@ -123,16 +120,6 @@ class SortingAlgorithm(QObject):
         self.cursor = self.conn.cursor()
         self.create_table()
 
-    def set_dataset(self, name, transform=None, target_transform=None):
-        self.dataset_filepath = name
-        self.dataset = dsh.DatasetHandler(self.terminal, transform=transform, target_transform=target_transform)
-
-    def save_dataset_to_file(self):
-        if hasattr(self, 'dataset_filepath') and self.dataset_filepath:
-            self.dataset.save_dataset(self.dataset_filepath)
-        else:
-            self.terminal.append("Dataset file path is not set.")
-
     def first_stage_processing(self):
         self.terminal.append("Starting first stage processing...")
         self.time_log.append("Time:\tFile:\tNumber of lines:\n")
@@ -209,7 +196,7 @@ class SortingAlgorithm(QObject):
             load_time = end - start
             self.time_log.append(f"{load_time}\t{file}\t{len(lines)}\n")
             data = self.process_filtered_lines(lines, filepath)
-            self.write_to(data)
+            self.write_to_database(data)
 
     def process_filtered_lines(self, lines, filepath):
         filtered_data = []
@@ -235,23 +222,15 @@ class SortingAlgorithm(QObject):
 
         return filtered_data
 
-    def write_to(self, data):
-        if self.DSDB == 1:
-            if len(data) == 0:
-                return
-            columns = ["MET", "RA", "Decl", "ch", "ty", "count", "selnbits", "phase", "locXRE", "locYRE", "locZRE"]
-            df = pd.DataFrame(data, columns=columns)
-            try:
-                df.to_sql('data', self.conn, if_exists='append', index=False)
-            except sqlite3.Error as e:
-                self.terminal.append(f"SQLite error: {e}")
-        elif self.DSDB == 2:
-            if len(data) == 0:
-                return
-            else:
-                self.dataset.append(data)
-        else:
-            self.terminal.append("Something went wrong while saving sorted data...")
+    def write_to_database(self, data):
+        if len(data) == 0:
+            return
+        columns = ["MET", "RA", "Decl", "ch", "ty", "count", "selnbits", "phase", "locXRE", "locYRE", "locZRE"]
+        df = pd.DataFrame(data, columns=columns)
+        try:
+            df.to_sql('data', self.conn, if_exists='append', index=False)
+        except sqlite3.Error as e:
+            self.terminal.append(f"SQLite error: {e}")
 
     def load_filtering_instructions(self, filename):
         try:
@@ -294,9 +273,6 @@ class SortingAlgorithm(QObject):
 
     def stop_sorting_process(self):
         self.stop_flag = True
-
-    def get_saving_option(self, option):
-        self.DSDB = option
 
     def save_loading_log(self):
         with open("TimeLoadingLogNumpy.txt", 'a') as time_file:

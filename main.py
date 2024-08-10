@@ -1,6 +1,7 @@
 import sys
 import os
 import threading
+import gc
 from PyQt5.QtCore import QSize, pyqtSignal, Qt, QObject
 from PyQt5.QtGui import QKeySequence, QIcon
 from PyQt5.QtWidgets import (
@@ -9,8 +10,9 @@ from PyQt5.QtWidgets import (
     QTreeWidgetItem, QShortcut
 )
 import sorting_algorithm
+import tensor_creator
 from selection_menu import SelectionFrame
-import DatasetHandler as dhs
+from tensor_selection_menu import TensorSelectionFrame
 
 class DirectoryLoader(QObject):
     update_progress = pyqtSignal(int)
@@ -50,6 +52,7 @@ class DirectoryLoader(QObject):
         root = QTreeWidgetItem([self.path])
         add_items(root, self.path)
         self.update_tree.emit(root)
+        gc.collect()
 
 class MainWindow(QMainWindow):
     update_progress_signal = pyqtSignal(int)
@@ -60,16 +63,18 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.sorting_thread = None
         self.selection_frame = None
         self.setFixedSize(QSize(1200, 700))
         self.setWindowTitle("IBEX Data Sorter")
         self.path = os.getcwd()
         self.txt_file_path = None
-        self.save_option = 1
+        self.stylesheet = "Themes/dark_stylesheet.css"
+        self.dataset_handler = None
         main_frame = QFrame(self)
         self.setCentralWidget(main_frame)
         main_layout = QVBoxLayout(main_frame)
-        self.dataset_handler = None
+
         top_layout = QHBoxLayout()
 
         self.file_dialog_frame = QFrame(self)
@@ -114,8 +119,8 @@ class MainWindow(QMainWindow):
         progress_layout.addWidget(self.second_progress_bar)
 
         buttons_layout = QVBoxLayout()
-        self.start_button_DB = QPushButton('Start sorting data (Save As DataBase)', self)
-        self.start_button_DS = QPushButton('Start sorting data (Save As DataSet)', self)
+        self.start_button_DB = QPushButton('Create Data Base', self)
+        self.start_button_DS = QPushButton('Create Tensor', self)
         self.start_button_DB.pressed.connect(self.confirm_sorting_DB)
         self.start_button_DS.pressed.connect(self.confirm_sorting_DS)
         self.stop_button = QPushButton('Stop', self)
@@ -145,11 +150,18 @@ class MainWindow(QMainWindow):
         self.sorting_alg.update_label.connect(self.update_label_signal)
         self.sorting_alg.update_second_label.connect(self.update_second_label_signal)
 
+        self.tensor_creator = tensor_creator.TensorCreator(self.terminal, os.getcwd())
+
+        self.tensor_creator.update_progress.connect(self.update_progress_signal)
+        self.tensor_creator.update_second_progress.connect(self.update_second_progress_signal)
+        self.tensor_creator.update_label.connect(self.update_label_signal)
+        self.tensor_creator.update_second_label.connect(self.update_second_label_signal)
+
         self.start_directory_loading(os.getcwd())
 
         self.shortcut_save = QShortcut(QKeySequence("Ctrl+S"), self)
         self.shortcut_save.activated.connect(self.save_txt_file)
-        self.load_qt_stylesheet("Themes/dark_stylesheet.css")
+        self.load_qt_stylesheet(self.stylesheet)
 
     def create_menubar(self):
         menubar = self.menuBar()
@@ -194,6 +206,7 @@ class MainWindow(QMainWindow):
         help_menu = menubar.addMenu("&Help")
 
     def load_qt_stylesheet(self, stylesheet):
+        self.stylesheet = stylesheet
         try:
             with open(stylesheet, 'r', encoding='utf-8') as file:
                 style_str = file.read()
@@ -254,18 +267,27 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def confirm_sorting_DB(self):
-        self.save_option = 1
-        self.selection_frame = SelectionFrame()
-        self.sorting_alg.get_saving_option(self.save_option)
+        self.selection_frame = SelectionFrame(self.stylesheet)
         self.selection_frame.sorting_options_selected.connect(self.start_sorting_data_with_options)
         self.selection_frame.show()
 
     def confirm_sorting_DS(self):
-        self.save_option = 2
-        self.selection_frame = SelectionFrame()
-        self.sorting_alg.get_saving_option(self.save_option)
-        self.selection_frame.sorting_options_selected.connect(self.start_sorting_data_with_options)
+        self.selection_frame = TensorSelectionFrame(self.stylesheet)
+        self.selection_frame.tensor_options_selected.connect(self.create_tensors_with_options)
         self.selection_frame.show()
+
+    def create_tensors_with_options(self, options):
+        print(options['instruction'])
+        print(options['quaternion'])
+        print(options['file_type'])
+        print(options['timespan'])
+        print(options['hex'])
+        self.tensor_creator.set_instruction(options['instruction'])
+        self.tensor_creator.set_quaternion_file(options['quaternion'])
+        self.tensor_creator.set_filetype(options['file_type'])
+        self.tensor_creator.set_timespan_attribute(options['timespan'])
+        self.tensor_creator.set_hex(options['hex'])
+        self.start_sorting_data_DS()
 
     def start_sorting_data_with_options(self, options):
         print(options['instruction'])
@@ -282,10 +304,7 @@ class MainWindow(QMainWindow):
         self.sorting_alg.set_filenames_for_sorting(options['file_types'])
         self.sorting_alg.set_channels(options['channels'])
         self.sorting_alg.set_particle_events(options['particle_events'])
-        if self.save_option == 1:
-            self.start_sorting_data_DB()
-        else:
-            self.start_sorting_data_DS()
+        self.start_sorting_data_DB()
 
     def start_sorting_data_DB(self):
         self.sorting_thread = threading.Thread(target=self.run_sorting_process_DB)
@@ -297,6 +316,7 @@ class MainWindow(QMainWindow):
 
     def stop_sorting_process(self):
         self.sorting_alg.stop_sorting_process()
+        self.tensor_creator.stop_tensor_creation_process()
 
     def run_sorting_process_DB(self):
         self.sorting_alg.set_path(self.path)
@@ -315,35 +335,30 @@ class MainWindow(QMainWindow):
                 self.save_thread.start()
         else:
             self.terminal.append("Choose database file first!")
+        gc.collect()
 
     def run_sorting_process_DS(self):
-        self.sorting_alg.set_path(self.path)
-        name, _ = QFileDialog.getSaveFileName(self, "Save Dataset File As", "", "Compressed Pickle Files (*.pt)")
+        self.tensor_creator.set_path(self.path)
+        name, _ = QFileDialog.getSaveFileName(self, "Save Tensor File As", "", "PyTorch Tensor (*.pt)")
 
         if name:
-            self.sorting_alg.set_dataset(name)
-            self.sorting_alg.first_stage_processing()
-            self.terminal.append("Sorting completed. Saving results...")
-            self.sorting_alg.save_dataset_to_file()
-            save_file_path, _ = QFileDialog.getSaveFileName(self, "Save text file with correct data paths", "",
-                                                            "Text Files (*.txt)")
-            self.sorting_alg.save_loading_log()
-            if save_file_path:
-                self.save_thread = threading.Thread(target=self.sorting_alg.save_correct_paths_to_file,
-                                                    args=(save_file_path,))
-                self.save_thread.start()
+            self.tensor_creator.set_file_prefix(name)
+            self.tensor_creator.create_data_tensor()
+            self.terminal.append("Tensor creation completed. Saving results...")
         else:
-            self.terminal.append("Choose dataset file first!")
+            self.terminal.append("Choose PyTorch Tensor file first!")
+        gc.collect()
 
     def load_dataset(self):
-        name, _ = QFileDialog.getOpenFileName(self, "Select Dataset file", "", "Pickled datasets (*.pt)")
-        if name:
-            self.terminal.append(f"Loading dataset from {name}...")
-            self.dataset_handler = dhs.DatasetHandler(self.terminal)
-            self.load_thread = threading.Thread(target=self.dataset_handler.unpack_dataset, args=(name,))
-            self.load_thread.start()
-        else:
-            self.terminal.append("Cannot open this dataset!")
+        # name, _ = QFileDialog.getOpenFileName(self, "Select Dataset file", "", "Pickled datasets (*.pt)")
+        # if name:
+        #     self.terminal.append(f"Loading dataset from {name}...")
+        #     self.dataset_handler = dhs.DatasetHandler(self.terminal)
+        #     self.load_thread = threading.Thread(target=self.dataset_handler.unpack_dataset, args=(name,))
+        #     self.load_thread.start()
+        # else:
+        #     self.terminal.append("Cannot open this dataset!")
+        pass
 
     def clear_terminals(self):
         self.terminal.clear()
