@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QLabel, QPushButton, QComboBox, QVBoxLayout, QHBoxLayout, QMainWindow, QFrame
 )
 
+
 class CheckableComboBox(QComboBox):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -49,18 +50,19 @@ class CheckableComboBox(QComboBox):
 class SelectionFrame(QMainWindow):
     sorting_options_selected = pyqtSignal(dict)
 
-    def __init__(self):
+    def __init__(self, stylesheet):
         super().__init__()
+        self.stylesheet = stylesheet
         self.condition = None
         self.quaternion_file_type = [".attdba", ".attd2a"]
         self.instruction = ["HiCullGoodTimes.txt", "LoGoodTimes.txt"]
         self.QualH_num = ["Q-ABC", "Q-AB", "Q-BC", "Q-AC", "None"]
         self.event_types = ['Direct events', 'Histogram events']
         self.file_types = ["hide", "lode", "hihb", "lohb"]
-        self.setFixedSize(QSize(380, 500))  # Adjusted size to accommodate new elements
+        self.setFixedSize(QSize(380, 500))
         self.setWindowTitle("Select sorting options:")
         self.init_sub_ui()
-        self.load_qt_stylesheet("Themes/dark_stylesheet.css")
+        self.load_qt_stylesheet(self.stylesheet)
 
     def load_qt_stylesheet(self, stylesheet):
         try:
@@ -81,7 +83,8 @@ class SelectionFrame(QMainWindow):
         middle_frame_layout.addLayout(display_layout)
 
         self.instruction_combobox = self.add_combobox(selection_layout, "Instruction File", self.instruction)
-        self.quaternion_combobox = self.add_combobox(selection_layout, "Quaternion File Type", self.quaternion_file_type)
+        self.quaternion_combobox = self.add_combobox(selection_layout, "Quaternion File Type",
+                                                     self.quaternion_file_type)
         self.event_combobox = self.add_combobox(selection_layout, "Event types", self.event_types)
         self.qualh_combobox = self.add_checkable_combobox(selection_layout, "QualH", self.QualH_num)
         self.filetype_combobox = self.add_checkable_combobox(selection_layout, "File Types", self.file_types)
@@ -107,6 +110,7 @@ class SelectionFrame(QMainWindow):
         main_layout.addLayout(bottom_layout)
         self.instruction_combobox.currentTextChanged.connect(self.update_additional_comboboxes)
         self.setCentralWidget(frame)
+        self.update_additional_comboboxes()
 
     def add_combobox(self, layout, label_text, options):
         label = QLabel(label_text)
@@ -143,6 +147,7 @@ class SelectionFrame(QMainWindow):
             self.qualh_combobox.addItems([f"TOF{i}" for i in range(0, 4)])
         else:
             return
+
     def on_confirm(self):
         instruction = self.instruction_combobox.currentText()
         quaternion = self.quaternion_combobox.currentText()
