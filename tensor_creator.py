@@ -13,6 +13,7 @@ class TensorCreator(QObject):
 
     def __init__(self, terminal, path):
         super().__init__()
+        self.channel_division = None # option to divide tensors by observed ENA channels
         self.path = path
         self.terminal = terminal
         self.instruction = None
@@ -42,6 +43,9 @@ class TensorCreator(QObject):
 
     def set_filetype(self, file_type):
         self.file_type = file_type
+
+    def set_channel_division(self, channel_division):
+        self.channel_division = channel_division
 
     def set_timespan_attribute(self, timespan_attribute):
         if timespan_attribute == "Every half year":
@@ -216,11 +220,9 @@ class TensorCreator(QObject):
                         text = self.remove_or_convert_hex_flags(text)
                         text = np.array(text, dtype=float)
 
-                        # Add the current file's data to the batch
                         batch_data_list.append(text)
                         batch_current_size += text.nbytes
 
-                        # If the batch exceeds the memory limit, save and reset the batch
                         if batch_current_size >= batch_size_limit:
                             self.save_batch(batch_data_list, save_path, first_batch)
                             first_batch = False
@@ -231,7 +233,6 @@ class TensorCreator(QObject):
                         self.update_second_progress.emit(int((self.scanned_files / self.total_files) * 100))
                         gc.collect()
 
-        # Save any remaining data in the last batch
         if batch_data_list:
             self.save_batch(batch_data_list, save_path, first_batch)
 
@@ -248,7 +249,6 @@ class TensorCreator(QObject):
             torch.save(tensor_data, save_path)
             self.terminal.append(f"Saved initial batch to {save_path}")
         else:
-            # Load existing tensor, concatenate, and save
             existing_data = torch.load(save_path)
             updated_data = torch.cat((existing_data, tensor_data), dim=0)
             torch.save(updated_data, save_path)

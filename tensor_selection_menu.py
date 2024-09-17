@@ -16,6 +16,7 @@ class TensorSelectionFrame(QMainWindow):
         self.file_types = ["hide", "lode", "hihb", "lohb"]
         self.structure_attribute = ["Every half year", "Every year", "All at once"]
         self.remove_hex_flags = ["Translate to int", "Replace with '0'"]
+        self.divide_by_channels = ["On", "Off"]
         self.setFixedSize(QSize(300, 380))
         self.setWindowTitle("Select tensor options:")
         self.init_sub_ui()
@@ -46,6 +47,8 @@ class TensorSelectionFrame(QMainWindow):
         self.timespan_combobox = self.add_combobox(selection_layout, "Timespan attribute",
                                                    self.structure_attribute)
         self.hex_combobox = self.add_combobox(selection_layout, "Hex flags", self.remove_hex_flags)
+
+        self.switch_channel_division = self.add_combobox(selection_layout, "Divide data by channels", self.divide_by_channels)
 
         bottom_layout = QHBoxLayout()
         confirm = QPushButton("Confirm")
@@ -87,11 +90,13 @@ class TensorSelectionFrame(QMainWindow):
         file_type = self.filetype_combobox.currentText()
         timespan = self.timespan_combobox.currentText()
         hex = self.hex_combobox.currentText()
+        channel_division = self.switch_channel_division.currentText()
         options = {
             'instruction': instruction,
             'quaternion': quaternion,
             'file_type': file_type,
             'timespan': timespan,
+            'divide_by_channels': channel_division,
             'hex': hex,
         }
         self.tensor_options_selected.emit(options)

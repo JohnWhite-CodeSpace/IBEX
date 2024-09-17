@@ -13,7 +13,7 @@ import sorting_algorithm
 import tensor_creator
 from selection_menu import SelectionFrame
 from tensor_selection_menu import TensorSelectionFrame
-
+from tensor_analyzer import PearsonsMatrixCreator
 class DirectoryLoader(QObject):
     update_progress = pyqtSignal(int)
     update_tree = pyqtSignal(object)
@@ -63,6 +63,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.matrix_thread = None
         self.sorting_thread = None
         self.selection_frame = None
         self.setFixedSize(QSize(1200, 700))
@@ -71,6 +72,7 @@ class MainWindow(QMainWindow):
         self.txt_file_path = None
         self.stylesheet = "Themes/dark_stylesheet.css"
         self.dataset_handler = None
+        self.pearson_matrix_handler = None
         main_frame = QFrame(self)
         self.setCentralWidget(main_frame)
         main_layout = QVBoxLayout(main_frame)
@@ -180,6 +182,13 @@ class MainWindow(QMainWindow):
         file_menu.addAction("Settings")
         preferences_menu = menubar.addMenu("&Preferences")
         dataset_menu = menubar.addMenu("&Datasets")
+        matrix_menu = menubar.addMenu("&Analysis")
+        initialise_pearsons_matrix = QAction('Create Pearsons matrix', self)
+        initialise_pearsons_matrix.triggered.connect(self.start_matrix_creation)
+        print_data_structure_description = QAction('Print data structure description', self)
+        print_data_structure_description.triggered.connect(self.print_data_structure_description)
+        matrix_menu.addAction(initialise_pearsons_matrix)
+        matrix_menu.addAction(print_data_structure_description)
         load_dataset = QAction('Load Dataset', self)
         load_dataset.triggered.connect(self.load_dataset)
         create_batch = QAction('Create Data Batch', self)
@@ -282,11 +291,13 @@ class MainWindow(QMainWindow):
         print(options['file_type'])
         print(options['timespan'])
         print(options['hex'])
+        print(options['divide_by_channels'])
         self.tensor_creator.set_instruction(options['instruction'])
         self.tensor_creator.set_quaternion_file(options['quaternion'])
         self.tensor_creator.set_filetype(options['file_type'])
         self.tensor_creator.set_timespan_attribute(options['timespan'])
         self.tensor_creator.set_hex(options['hex'])
+        self.tensor_creator.set_channel_division(options['divide_by_channels'])
         self.start_sorting_data_DS()
 
     def start_sorting_data_with_options(self, options):
@@ -318,6 +329,9 @@ class MainWindow(QMainWindow):
         self.sorting_alg.stop_sorting_process()
         self.tensor_creator.stop_tensor_creation_process()
 
+    def start_matrix_creation(self):
+        self.matrix_thread = threading.Thread(target=self.init_pearsons_matrix_creation)
+        self.matrix_thread.start()
     def run_sorting_process_DB(self):
         self.sorting_alg.set_path(self.path)
         name, _ = QFileDialog.getSaveFileName(self, "Save DataBase File As", "", "DataBase Files (*.db)")
@@ -360,6 +374,22 @@ class MainWindow(QMainWindow):
         #     self.terminal.append("Cannot open this dataset!")
         pass
 
+    def init_pearsons_matrix_creation(self):
+        if not self.pearson_matrix_handler:
+            hi_instruction_file = "HiCullGoodTimes.txt"
+            lo_instruction_file = "LoGoodTimes.txt"
+            self.pearson_matrix_handler = PearsonsMatrixCreator(self.terminal, hi_instruction_file, lo_instruction_file)
+
+        hi_directory = QFileDialog.getExistingDirectory(self, "Select Hi dataset folder")
+        lo_directory = QFileDialog.getExistingDirectory(self, "Select Lo dataset folder")
+
+        if hi_directory and lo_directory:
+            self.terminal.append("Initializing Pearson matrix creation...")
+            self.pearson_matrix_handler.calculate_and_save_pearsons_matrix(hi_directory, lo_directory)
+    def print_data_structure_description(self):
+        if not self.pearson_matrix_handler:
+            self.pearson_matrix_handler = PearsonsMatrixCreator(self.terminal)
+        self.pearson_matrix_handler.print_short_data_manual()
     def clear_terminals(self):
         self.terminal.clear()
         self.txt_edit.clear()
