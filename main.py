@@ -388,7 +388,7 @@ class MainWindow(QMainWindow):
             self.pearson_matrix_handler.calculate_and_save_pearsons_matrix(hi_directory, lo_directory)
     def print_data_structure_description(self):
         if not self.pearson_matrix_handler:
-            self.pearson_matrix_handler = PearsonsMatrixCreator(self.terminal)
+            self.pearson_matrix_handler = PearsonsMatrixCreator(self.terminal, "HiCullGoodTimes.txt", "LoGoodTimes.txt")
         self.pearson_matrix_handler.print_short_data_manual()
     def clear_terminals(self):
         self.terminal.clear()

@@ -74,58 +74,36 @@ class PearsonsMatrixCreator:
         return covXY / (std_dev_X * std_dev_Y)
 
     def calculate_and_save_pearsons_matrix(self, hi_tensor_directory, lo_tensor_directory):
-        # Helper function to load tensor and split based on encoding list
         def process_tensor(tensor_directory, encoding_list, save_dir, group_pairs=False):
-            # Load the main tensor
             main_tensor = torch.load(os.path.join(tensor_directory, os.listdir(tensor_directory)[0]))
-
-            # Convert the encoding list to integers (assuming hexadecimal representation)
-            encoding_ints = [int(encoding, 16) for encoding in encoding_list]
-
-            # Create a directory to save the split tensors
+            encoding_ints = [int(encoding, 16) if isinstance(encoding, str) else encoding for encoding in encoding_list]
             os.makedirs(save_dir, exist_ok=True)
-
-            # Grouping flag
             paired_tensors = {}
-
-            # Iterate over the unique encoding integers and split the tensor
             for encoding in encoding_ints:
                 matching_tensor = main_tensor[main_tensor[:, 4] == encoding]
-
-                # Group Lo channels if needed
-                if group_pairs and encoding < 30:  # assuming 21-28 and 41-48
-                    pair_encoding = encoding + 20  # match 21 with 41, 22 with 42, etc.
+                if group_pairs and encoding < 30:
+                    pair_encoding = encoding + 20
                     pair_tensor = main_tensor[main_tensor[:, 4] == pair_encoding]
-
-                    # Combine the tensors
                     combined_tensor = torch.cat((matching_tensor, pair_tensor), dim=0)
                     paired_tensors[encoding] = combined_tensor
-
-                    # Remove the pair from the encoding list to avoid duplication
                     encoding_ints.remove(pair_encoding)
                 else:
-                    # Save the tensor directly
                     paired_tensors[encoding] = matching_tensor
 
-            # Save the split tensors
             for encoding, tensor in paired_tensors.items():
                 tensor_save_path = os.path.join(save_dir, f"tensor_{encoding}.pt")
                 torch.save(tensor, tensor_save_path)
                 self.terminal.append(f"Saved tensor for encoding {encoding} to {tensor_save_path}")
 
-            # Free space using garbage collector
             del main_tensor, paired_tensors
             gc.collect()
 
-        # Process Hi tensors
         hi_save_dir = os.path.join(hi_tensor_directory, "split_tensors")
         process_tensor(hi_tensor_directory, self.Hi_channel_encoding_list, hi_save_dir)
 
-        # Process Lo tensors, with grouping for pairs (21,41), (22,42), ...
         lo_save_dir = os.path.join(lo_tensor_directory, "split_tensors")
         process_tensor(lo_tensor_directory, self.Lo_channel_encoding_list, lo_save_dir, group_pairs=True)
 
-        # Indicate completion
         self.terminal.append("Tensors split and saved successfully.")
 
 
