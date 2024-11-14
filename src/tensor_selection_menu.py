@@ -14,7 +14,7 @@ class TensorSelectionFrame(QMainWindow):
         self.quaternion_file = [".attdba", ".attd2a"]
         self.instruction_file = ["HiCullGoodTimes.txt", "LoGoodTimes.txt"]
         self.file_types = ["hide", "lode", "hihb", "lohb"]
-        self.structure_attribute = ["Every half year", "Every year", "All at once"]
+        self.structure_attribute = ["By channels", "Every half year", "Every year", "All at once"]
         self.remove_hex_flags = ["Translate to int", "Replace with '0'"]
         self.divide_by_channels = ["On", "Off"]
         self.setFixedSize(QSize(300, 380))

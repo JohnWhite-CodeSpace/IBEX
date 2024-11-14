@@ -9,6 +9,7 @@ class PearsonsMatrixCreator:
 
     def __init__(self, terminal, hi_instruction_file, lo_instruction_file):
         self.data_container = None
+        data_container = None
         self.terminal = terminal
         self.visuals = False
         self.save_to_file = False
@@ -38,6 +39,12 @@ class PearsonsMatrixCreator:
             self.terminal.append(f"An unexpected error occurred while loading data: {e}")
         finally:
             gc.collect()
+
+    def load_instruction_file(self, instruction_file):
+        try:
+            return np.loadtxt(instruction_file, dtype='str')
+        except FileNotFoundError as e:
+            self.terminal.append(f"File not found: {e}")
 
     def print_short_data_manual(self):
         self.terminal.append("File column description:")
@@ -73,41 +80,11 @@ class PearsonsMatrixCreator:
         std_dev_Y = np.std(Y_vals)
         return covXY / (std_dev_X * std_dev_Y)
 
-    def calculate_and_save_pearsons_matrix(self, hi_tensor_directory, lo_tensor_directory):
-        def process_tensor(tensor_directory, encoding_list, save_dir, group_pairs=False):
-            main_tensor = torch.load(os.path.join(tensor_directory, os.listdir(tensor_directory)[0]))
-            encoding_ints = [int(encoding, 16) if isinstance(encoding, str) else encoding for encoding in encoding_list]
-            os.makedirs(save_dir, exist_ok=True)
-            paired_tensors = {}
-            for encoding in encoding_ints:
-                matching_tensor = main_tensor[main_tensor[:, 4] == encoding]
-                if group_pairs and encoding < 30:
-                    pair_encoding = encoding + 20
-                    pair_tensor = main_tensor[main_tensor[:, 4] == pair_encoding]
-                    combined_tensor = torch.cat((matching_tensor, pair_tensor), dim=0)
-                    paired_tensors[encoding] = combined_tensor
-                    encoding_ints.remove(pair_encoding)
-                else:
-                    paired_tensors[encoding] = matching_tensor
-
-            for encoding, tensor in paired_tensors.items():
-                tensor_save_path = os.path.join(save_dir, f"tensor_{encoding}.pt")
-                torch.save(tensor, tensor_save_path)
-                self.terminal.append(f"Saved tensor for encoding {encoding} to {tensor_save_path}")
-
-            del main_tensor, paired_tensors
-            gc.collect()
-
-        hi_save_dir = os.path.join(hi_tensor_directory, "split_tensors")
-        process_tensor(hi_tensor_directory, self.Hi_channel_encoding_list, hi_save_dir)
-
-        lo_save_dir = os.path.join(lo_tensor_directory, "split_tensors")
-        process_tensor(lo_tensor_directory, self.Lo_channel_encoding_list, lo_save_dir, group_pairs=True)
-
-        self.terminal.append("Tensors split and saved successfully.")
-
-
-
-
+    def search_algorithm(self, data_container, instruction_file):
+        if instruction_file == "HiCullGoodTimes.txt":
+            inst_line_len = 14
+            for i in range(len())
+        elif instruction_file == "LoGoodTime.txt":
+            inst_line_len = 13
 
 

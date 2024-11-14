@@ -13,7 +13,7 @@ class TensorCreator(QObject):
 
     def __init__(self, terminal, path):
         super().__init__()
-        self.channel_division = None # option to divide tensors by observed ENA channels
+        self.channel_division = None  # option to divide tensors by observed ENA channels
         self.path = path
         self.terminal = terminal
         self.instruction = None
@@ -27,7 +27,6 @@ class TensorCreator(QObject):
         self.total_dirs = 0
         self.scanned_files = 0
         self.total_files = 0
-
 
     def set_path(self, path):
         self.path = path
@@ -54,6 +53,8 @@ class TensorCreator(QObject):
             self.structure_attribute = 1
         elif timespan_attribute == "All at once":
             self.structure_attribute = 2
+        elif timespan_attribute == "By channels":
+            self.structure_attribute = 3
 
     def set_hex(self, hex):
         if hex == "Translate to int":
@@ -69,6 +70,8 @@ class TensorCreator(QObject):
             self.init_year_tensors()
         elif self.structure_attribute == 2:
             self.init_alldata_tensors()
+        elif self.structure_attribute == 3:
+            self.init_channel_tensors()
         else:
             self.terminal.append("Invalid tensor creation option selected!")
             return
@@ -89,7 +92,7 @@ class TensorCreator(QObject):
             self.update_label.emit(proglabel)
             data_list = []
             self.scanned_dirs += 1
-            self.update_progress.emit(int((self.scanned_dirs/self.total_dirs)*100))
+            self.update_progress.emit(int((self.scanned_dirs / self.total_dirs) * 100))
             gc.collect()
             for root, _, files in os.walk(subdir_path):
                 self.total_files = len(files)
@@ -108,8 +111,8 @@ class TensorCreator(QObject):
                             text = self.remove_or_convert_hex_flags(text)
                             text = np.array(text, dtype=float)
                             data_list.append(text)
-                        self.scanned_files+=1
-                        self.update_second_progress.emit(int((self.scanned_files/self.total_files)*100))
+                        self.scanned_files += 1
+                        self.update_second_progress.emit(int((self.scanned_files / self.total_files) * 100))
                         gc.collect()
             if data_list:
                 combined_data = np.vstack(data_list)
@@ -240,6 +243,77 @@ class TensorCreator(QObject):
         self.update_label.emit(proglabel)
         gc.collect()
 
+    def init_channel_tensors(self):
+        if self.instruction == "HiCullGoodTimes.txt":
+            channel_num = 6
+            self.channel_tensor_creation(channel_num)
+        elif self.instruction == "LoGoodTimes.txt":
+            channel_num = 8
+            self.channel_tensor_creation(channel_num)
+        else:
+            self.terminal.appen("Incorrect instruction file. Aborting...")
+            pass
+
+    def channel_tensor_creation(self, channel_num):
+        for i in range(1, channel_num+1):
+            channel_file_regex = self.file_type + '-' + f"{i}"
+            proglabel = f"Processing files {channel_file_regex}"
+            self.update_label.emit(proglabel)
+
+            batch_size_limit = 2 * 1024 ** 3  # 2 GB limit per batch
+            batch_data_list = []
+            batch_current_size = 0
+            first_batch = True
+            save_path = f"{self.savefile_prefix}_{i}.pt"
+
+            self.total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(self.path))
+            self.scanned_dirs = 0
+            self.update_second_progress.emit(0)
+            self.update_progress.emit(0)
+
+            for root, dirs, files in os.walk(self.path):
+                if self.stop_tensor:
+                    proglabel = "Data processing stopped!"
+                    self.update_label.emit(proglabel)
+                    return
+
+                self.scanned_dirs += 1
+                self.update_progress.emit(int((self.scanned_dirs / self.total_dirs) * 100))
+                self.scanned_files = 0
+                self.total_files = len(files)
+
+                if any(file.endswith(self.quaternion_file) for file in files):
+                    for file in files:
+
+                        if channel_file_regex in file:
+                            file_path = os.path.join(root, file)
+                            proglabel2 = f"Loading file: {file_path}"
+                            self.update_second_label.emit(proglabel2)
+
+                            text = np.loadtxt(file_path, dtype='str')
+                            text = self.remove_or_convert_hex_flags(text)
+                            text = np.array(text, dtype=float)
+
+                            batch_data_list.append(text)
+                            batch_current_size += text.nbytes
+
+                            if batch_current_size >= batch_size_limit:
+                                self.save_batch(batch_data_list, save_path, first_batch)
+                                first_batch = False
+                                batch_data_list = []
+                                batch_current_size = 0
+
+                            self.scanned_files += 1
+                            self.update_second_progress.emit(int((self.scanned_files / self.total_files) * 100))
+                            gc.collect()
+
+            if batch_data_list:
+                self.save_batch(batch_data_list, save_path, first_batch)
+
+            proglabel = "Data processing finished!"
+            self.update_label.emit(proglabel)
+            gc.collect()
+
     def save_batch(self, batch_data_list, save_path, first_batch):
         """Save the batch of data to a file, appending if not the first batch."""
         combined_data = np.vstack(batch_data_list)
@@ -262,13 +336,14 @@ class TensorCreator(QObject):
             ty_column = data_list[:, 4]
             int_ch_column = np.vectorize(lambda x: int(x, 16))(ch_column)
             int_ty_column = np.vectorize(lambda x: int(x, 16))(ty_column)
-            data_list[:, 3] = int_ch_column # changing ch from hex to int
-            data_list[:, 4] = int_ty_column # changing ty from hex to int
-            data_list[:, 6] = '0' # selnbits are not used so ve just ignore them (i dont know what they are and i dont care tbh)
+            data_list[:, 3] = int_ch_column  # changing ch from hex to int
+            data_list[:, 4] = int_ty_column  # changing ty from hex to int
+            data_list[:,
+            6] = '0'  # selnbits are not used so ve just ignore them (i dont know what they are and i dont care tbh)
         else:
             data_list[:, 3] = '0'
             data_list[:, 4] = '0'
-            data_list[:, 6] = '0' # still ignoring them fuckers
+            data_list[:, 6] = '0'  # still ignoring them fuckers
         gc.collect()
         return data_list
 
